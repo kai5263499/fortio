@@ -69,7 +69,7 @@ func main() {
 }
 ```
 
-Checkout above example from [example.go](https://github.com/CrowdStrike/fortio/example/example.go)
+Checkout above example from [example.go](https://github.com/CrowdStrike/fortio/blob/master/example/example.go)
 
 ## Contributors
 
