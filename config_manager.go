@@ -15,20 +15,29 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
     "unicode/utf8"
+    "bytes"
 )
 
 const tagName = "config"
 
 // ConfigManager auto wires the given config pointer with given set of
 // config loaders to NewConfigManager API
-type ConfigManager struct {
+type Manager struct {
 	rootCmd       *cobra.Command
 	logger        Logger
 	configLoaders []ConfigLoader
 }
 
+// NewConfigManagerWithRootCmd returns a configManager using the provided rootCmd
+func NewConfigManagerWithRootCmd(rootCmd *cobra.Command, configLoaders ...ConfigLoader) *Manager {
+    return &Manager{
+        rootCmd:     rootCmd,
+        configLoaders: configLoaders,
+    }
+}
+
 // NewConfigManager returns new instance of ConfigManager
-func NewConfigManager(appName, description string, configLoaders ...ConfigLoader) *ConfigManager {
+func NewConfigManager(appName, description string, configLoaders ...ConfigLoader) *Manager {
 	rootCmd := &cobra.Command{
 		Use:   appName,
 		Short: description,
@@ -46,7 +55,7 @@ func NewConfigManager(appName, description string, configLoaders ...ConfigLoader
 	rootCmd.SetHelpCommand(helpCmd)
 	rootCmd.AddCommand(helpCmd)
 
-	return &ConfigManager{
+	return &Manager{
 		logger:  NewStdLogger(3, log.Ldate|log.Ltime),
 		rootCmd: rootCmd,
 		configLoaders: configLoaders,
@@ -54,13 +63,13 @@ func NewConfigManager(appName, description string, configLoaders ...ConfigLoader
 }
 
 // SetLogger will set given logger and uses it for logging
-func (cm *ConfigManager) SetLogger(logger Logger) {
+func (cm *Manager) SetLogger(logger Logger) {
 	cm.logger = logger
 }
 
 // Load will create command line flags for given config and loads values into
 // it from environment variables
-func (cm *ConfigManager) Load(config Config) error {
+func (cm *Manager) Load(config Config) error {
 	err := cm.createCommandLineFlags(config)
 	if err != nil {
 		cm.logger.Errorf("Unable to load config - %v", err)
@@ -92,7 +101,7 @@ func (cm *ConfigManager) Load(config Config) error {
 
 // createCommandLineFlags will create command line flags for given config via Cobra and Viper
 // to support command line overriding of config values
-func (cm *ConfigManager) createCommandLineFlags(config interface{}) error {
+func (cm *Manager) createCommandLineFlags(config interface{}) error {
 	fields := make(map[string]field)
 	getAllFields(config, fields)
 	for name, field := range fields {
@@ -253,4 +262,22 @@ func camelCaseToUnderscore(s string) string {
 	}
 
 	return string(out)
+}
+
+// StdinConfigLoader provides autowiring of config values piped in from stdin
+type StdinConfigLoader struct { }
+
+// Load trigger recursive load of config values from yaml piped to stdin
+func (s *StdinConfigLoader) Load(config interface{}) error {
+    stat, _ := os.Stdin.Stat()
+    if (stat.Mode() & os.ModeCharDevice) == 0 {
+        buf := new(bytes.Buffer)
+        buf.ReadFrom(os.Stdin)
+
+        viper.SetConfigType("yaml")
+        if err := viper.ReadConfig(buf); err != nil {
+            return err
+        }
+    }
+    return nil
 }
