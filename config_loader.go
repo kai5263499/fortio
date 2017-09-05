@@ -29,6 +29,11 @@ func (cmd *CmdLineConfigLoader) Load(config Config) error {
 func (cmd *CmdLineConfigLoader) loadValue(dest reflect.Value, name string) error {
 	switch dest.Elem().Type().Kind() {
 	case reflect.Struct:
+        // Don't enumerate fields if interface implements StringParsable
+        if sp, ok := dest.Interface().(StringParsable); ok {
+            val := viper.GetString(name)
+            sp.ParseString(val)
+        }
 		for i := 0; i < dest.Elem().Type().NumField(); i++ {
 			fieldStruct := dest.Elem().Type().Field(i)
 			cmd.loadValue(dest.Elem().Field(i).Addr(), fieldStruct.Name)
@@ -36,6 +41,13 @@ func (cmd *CmdLineConfigLoader) loadValue(dest reflect.Value, name string) error
 	case reflect.String:
 		val := viper.GetString(name)
 		dest.Elem().SetString(val)
+    case reflect.Slice:
+        val := viper.GetString(name)
+
+        sl := StringList{}
+        sl.Set(val)
+
+        dest.Elem().Set(reflect.ValueOf(sl))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		val := viper.GetInt64(name)
 		dest.Elem().SetInt(val)
@@ -48,6 +60,8 @@ func (cmd *CmdLineConfigLoader) loadValue(dest reflect.Value, name string) error
 	case reflect.Bool:
 		val := viper.GetBool(name)
 		dest.Elem().SetBool(val)
+    case reflect.Interface:
+        // Skip interface hints
 	default:
 		// TODO: support for map/slice types
 		msg := fmt.Sprintf("unsupported type: %s", dest.Elem().Type())
