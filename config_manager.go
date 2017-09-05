@@ -9,12 +9,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"log"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+    "unicode/utf8"
 )
 
 const tagName = "config"
@@ -169,12 +169,32 @@ type field struct {
 	required     bool
 }
 
+func firstLowerPos(s string) int {
+    for p, c := range s {
+        if !unicode.IsUpper(c) {
+            return p
+        }
+    }
+
+    return -1
+}
+
+// Turn the first character in a camel case string to lowercase
+// If there are more than one uppercase characters then convert
+// all of them except for the last to lowercase
 func lowerFirst(s string) string {
-	if s == "" {
-		return ""
-	}
-	r, n := utf8.DecodeRuneInString(s)
-	return string(unicode.ToLower(r)) + s[n:]
+    firstLower := firstLowerPos(s)
+
+    var fixed string
+
+    if firstLower > 1 {
+        fixed = strings.ToLower(string(s[:firstLower-1])) + string(s[firstLower-1:])
+    } else {
+        r, n := utf8.DecodeRuneInString(s)
+        fixed = string(unicode.ToLower(r)) + s[n:]
+    }
+
+    return fixed
 }
 
 func getAllFields(obj interface{}, m map[string]field) {
