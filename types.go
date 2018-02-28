@@ -1,6 +1,9 @@
 package fortio
 
-import "strings"
+import (
+    "strings"
+    "time"
+)
 
 // StringList is of type []string
 type StringList []string
@@ -25,9 +28,30 @@ func (sl *StringList) Set(s string) error {
 
 // Type returns type of StringList
 func (sl *StringList) Type() string {
-    return "config.StringList"
+    return "fortio.StringList"
 }
 
 type StringParsable interface {
     ParseString(string) error
+}
+
+// Duration is wrapper on time.Duration to support via
+// new config structure for auto wiring
+type Duration struct {
+    time.Duration
+}
+
+// String return string version of Duration, same as time.Duration
+func (d *Duration) String() string { return d.Duration.String() }
+
+// Set will parse given string as time.Duration and sets to Duration
+func (d *Duration) Set(s string) error {
+    v, err := time.ParseDuration(s)
+    *d = Duration{v}
+    return err
+}
+
+// Type returns type name
+func (d *Duration) Type() string {
+    return "fortio.Duration"
 }

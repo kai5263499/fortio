@@ -2,6 +2,8 @@ package fortio
 
 import (
 	"fmt"
+	"regexp"
+	"time"
 
 	"unicode"
 
@@ -12,17 +14,29 @@ import (
 
 	"log"
 
+	"bytes"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-    "unicode/utf8"
-    "bytes"
 )
 
-const tagName = "config"
+const (
+	tagName = "config"
+
+	environmentVariable namespace = "env"
+)
+
+var camelCaseRegex = regexp.MustCompile("(^[^A-Z]*|[A-Z]*)([A-Z][^A-Z]+|$)")
+
+// namespace identifies the which namespace the config belongs to like
+// environment variable, cassandra registry or kafka registry, so to
+// parse accordingly
+type namespace string
 
 // ConfigManager auto wires the given config pointer with given set of
 // config loaders to NewConfigManager API
 type Manager struct {
+	appName       string
 	rootCmd       *cobra.Command
 	logger        Logger
 	configLoaders []ConfigLoader
@@ -30,10 +44,10 @@ type Manager struct {
 
 // NewConfigManagerWithRootCmd returns a configManager using the provided rootCmd
 func NewConfigManagerWithRootCmd(rootCmd *cobra.Command, configLoaders ...ConfigLoader) *Manager {
-    return &Manager{
-        rootCmd:     rootCmd,
-        configLoaders: configLoaders,
-    }
+	return &Manager{
+		rootCmd:       rootCmd,
+		configLoaders: configLoaders,
+	}
 }
 
 // NewConfigManager returns new instance of ConfigManager
@@ -55,9 +69,21 @@ func NewConfigManager(appName, description string, configLoaders ...ConfigLoader
 	rootCmd.SetHelpCommand(helpCmd)
 	rootCmd.AddCommand(helpCmd)
 
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Version of Config Manager",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("1.0")
+			os.Exit(0)
+		},
+	}
+
+	rootCmd.AddCommand(versionCmd)
+
 	return &Manager{
-		logger:  NewStdLogger(3, log.Ldate|log.Ltime),
-		rootCmd: rootCmd,
+		appName:       appName,
+		logger:        NewStdLogger(3, log.Ldate|log.Ltime),
+		rootCmd:       rootCmd,
 		configLoaders: configLoaders,
 	}
 }
@@ -70,7 +96,7 @@ func (cm *Manager) SetLogger(logger Logger) {
 // Load will create command line flags for given config and loads values into
 // it from environment variables
 func (cm *Manager) Load(config Config) error {
-	err := cm.createCommandLineFlags(config)
+	err := cm.createCommandLineFlags(cm.rootCmd, config)
 	if err != nil {
 		cm.logger.Errorf("Unable to load config - %v", err)
 		return err
@@ -101,7 +127,7 @@ func (cm *Manager) Load(config Config) error {
 
 // createCommandLineFlags will create command line flags for given config via Cobra and Viper
 // to support command line overriding of config values
-func (cm *Manager) createCommandLineFlags(config interface{}) error {
+func (cm *Manager) createCommandLineFlags(cmd *cobra.Command, config interface{}) error {
 	fields := make(map[string]field)
 	getAllFields(config, fields)
 	for name, field := range fields {
@@ -109,101 +135,178 @@ func (cm *Manager) createCommandLineFlags(config interface{}) error {
 
 		switch ptr := field.addr.(type) {
 		case *string:
-			viper.SetDefault(lFirst, field.defaultValue)
-			cm.rootCmd.PersistentFlags().String(lFirst, *ptr, field.usage)
+			if field.defaultValue != "" {
+				viper.SetDefault(lFirst, field.defaultValue)
+			}
+			cmd.PersistentFlags().String(lFirst, *ptr, field.usage)
 		case *int:
 			val, err := strconv.Atoi(field.defaultValue)
 			if err != nil {
 				cm.logger.Fatalf("default specified for %s is not a int", field.name)
 			}
 			viper.SetDefault(lFirst, val)
-			cm.rootCmd.PersistentFlags().Int(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().Int(lFirst, *ptr, field.usage)
+		case *int8:
+			val, err := strconv.ParseInt(field.defaultValue, 10, 8)
+			if err != nil {
+				cm.logger.Fatalf("default specified for %s is not a int8 val=%v defaultValue=%v", field.name, val, field.defaultValue)
+			}
+			viper.SetDefault(lFirst, val)
+			cmd.PersistentFlags().Int8(lFirst, *ptr, field.usage)
+		case *int32:
+			val, err := strconv.ParseInt(field.defaultValue, 10, 32)
+			if err != nil {
+				cm.logger.Fatalf("default specified for %s is not a int32 val=%v defaultValue=%v", field.name, val, field.defaultValue)
+			}
+			viper.SetDefault(lFirst, val)
+			cmd.PersistentFlags().Int32(lFirst, *ptr, field.usage)
 		case *int64:
 			val, err := strconv.ParseInt(field.defaultValue, 10, 64)
 			if err != nil {
 				cm.logger.Fatalf("default specified for %s is not a int64 val=%v defaultValue=%v", field.name, val, field.defaultValue)
 			}
 			viper.SetDefault(lFirst, val)
-			cm.rootCmd.PersistentFlags().Int64(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().Int64(lFirst, *ptr, field.usage)
 		case *uint:
 			val, err := strconv.Atoi(field.defaultValue)
 			if err != nil {
 				cm.logger.Fatalf("default specified for %s is not a uint", field.name)
 			}
 			viper.SetDefault(lFirst, val)
-			cm.rootCmd.PersistentFlags().Uint(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().Uint(lFirst, *ptr, field.usage)
+		case *uint8:
+			val, err := strconv.ParseUint(field.defaultValue, 10, 8)
+			if err != nil {
+				cm.logger.Fatalf("default specified for %s is not a uint8", field.name)
+			}
+			viper.SetDefault(lFirst, val)
+			cmd.PersistentFlags().Uint8(lFirst, *ptr, field.usage)
+		case *uint16:
+			val, err := strconv.ParseUint(field.defaultValue, 10, 16)
+			if err != nil {
+				cm.logger.Fatalf("default specified for %s is not a uint16", field.name)
+			}
+			viper.SetDefault(lFirst, val)
+			cmd.PersistentFlags().Uint16(lFirst, *ptr, field.usage)
+		case *uint32:
+			val, err := strconv.ParseUint(field.defaultValue, 10, 32)
+			if err != nil {
+				cm.logger.Fatalf("default specified for %s is not a uint32", field.name)
+			}
+			viper.SetDefault(lFirst, val)
+			cmd.PersistentFlags().Uint32(lFirst, *ptr, field.usage)
 		case *uint64:
 			val, err := strconv.ParseUint(field.defaultValue, 10, 64)
 			if err != nil {
 				cm.logger.Fatalf("default specified for %s is not a uint64", field.name)
 			}
 			viper.SetDefault(lFirst, val)
-			cm.rootCmd.PersistentFlags().Uint64(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().Uint64(lFirst, *ptr, field.usage)
+		case *float32:
+			val, err := strconv.ParseFloat(field.defaultValue, 32)
+			if err != nil {
+				cm.logger.Fatalf("default specified for %s is not a float32", field.name)
+			}
+			viper.SetDefault(lFirst, val)
+			cmd.PersistentFlags().Float32(lFirst, *ptr, field.usage)
 		case *float64:
 			val, err := strconv.ParseFloat(field.defaultValue, 64)
 			if err != nil {
 				cm.logger.Fatalf("default specified for %s is not a float64", field.name)
 			}
 			viper.SetDefault(lFirst, val)
-			cm.rootCmd.PersistentFlags().Float64(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().Float64(lFirst, *ptr, field.usage)
 		case *bool:
 			val, err := strconv.ParseBool(field.defaultValue)
 			if err != nil {
 				cm.logger.Fatalf("default specified for %s is not a bool", field.name)
 			}
 			viper.SetDefault(lFirst, val)
-			cm.rootCmd.PersistentFlags().Bool(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().Bool(lFirst, *ptr, field.usage)
+		case pflag.Value:
+			// Any type implementing pflag.Value will be automatically supported
+			viper.SetDefault(lFirst, field.defaultValue)
+			cmd.PersistentFlags().Var(ptr, lFirst, field.usage)
+		case *time.Duration:
+			def := viper.GetDuration(field.defaultValue)
+			viper.SetDefault(lFirst, field.defaultValue)
+			cmd.PersistentFlags().Duration(lFirst, def, field.usage)
 		default:
 			cm.logger.Warnf("unknown field %s type %v", field.name, reflect.TypeOf(field))
-			// TODO: support for types implementing pflag.Value
 		}
 
 		underscoreField := camelCaseToUnderscore(name)
-		if field.env != "" {
-			viper.BindEnv(lFirst, field.env)
-		} else {
-			viper.BindEnv(lFirst, underscoreField)
+		switch field.namespace {
+		case environmentVariable:
+			if field.env != "" {
+				viper.BindEnv(lFirst, strings.ToUpper(field.env))
+			} else {
+				viper.BindEnv(lFirst, underscoreField)
+			}
 		}
-		viper.BindPFlag(lFirst, cm.rootCmd.PersistentFlags().Lookup(lFirst))
+		viper.BindPFlag(lFirst, cmd.PersistentFlags().Lookup(lFirst))
 	}
 	return nil
+}
+
+// CreateCommandLineFlags will create command line flags for given config via Cobra and Viper
+// to support command line overriding of config values
+func (cm *Manager) CreateCommandLineFlags(config interface{}) error {
+	return cm.createCommandLineFlags(cm.rootCmd, config)
 }
 
 type field struct {
 	addr         interface{}
 	name         string
 	defaultValue string
+	namespace    namespace
 	usage        string
 	env          string
 	required     bool
 }
 
 func firstLowerPos(s string) int {
-    for p, c := range s {
-        if !unicode.IsUpper(c) {
-            return p
-        }
-    }
+	for p, c := range s {
+		if !unicode.IsUpper(c) {
+			return p
+		}
+	}
 
-    return -1
+	return -1
 }
 
 // Turn the first character in a camel case string to lowercase
 // If there are more than one uppercase characters then convert
 // all of them except for the last to lowercase
 func lowerFirst(s string) string {
-    firstLower := firstLowerPos(s)
-
-    var fixed string
-
-    if firstLower > 1 {
-        fixed = strings.ToLower(string(s[:firstLower-1])) + string(s[firstLower-1:])
-    } else {
-        r, n := utf8.DecodeRuneInString(s)
-        fixed = string(unicode.ToLower(r)) + s[n:]
-    }
-
-    return fixed
+	result := []rune{}
+	backtrack := []rune{}
+	for i, x := range s {
+		if unicode.IsUpper(x) {
+			if i == 0 {
+				result = append(result, unicode.ToLower(x))
+			} else {
+				backtrack = append(backtrack, x)
+			}
+		} else {
+			// go back and take all out of backtrack and convert it to lower
+			// and append to result, except for the last one
+			if len(backtrack) > 0 {
+				for j := 0; j < len(backtrack)-1; j++ {
+					result = append(result, unicode.ToLower(backtrack[j]))
+				}
+				result = append(result, backtrack[len(backtrack)-1])
+				backtrack = []rune{}
+			}
+			result = append(result, x)
+		}
+	}
+	if len(backtrack) > 0 {
+		for _, v := range backtrack {
+			result = append(result, unicode.ToLower(v))
+		}
+	}
+	return string(result)
 }
 
 func getAllFields(obj interface{}, m map[string]field) {
@@ -250,34 +353,32 @@ func getField(fld reflect.StructField) field {
 }
 
 func camelCaseToUnderscore(s string) string {
-	runes := []rune(s)
-	size := len(runes)
-
-	var out []rune
-	for i := 0; i < size; i++ {
-		if i > 0 && unicode.IsUpper(runes[i]) && ((i+1 < size && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
-			out = append(out, '_')
+	var out []string
+	for _, parts := range camelCaseRegex.FindAllStringSubmatch(s, -1) {
+		if parts[1] != "" {
+			out = append(out, parts[1])
 		}
-		out = append(out, unicode.ToUpper(runes[i]))
+		if parts[2] != "" {
+			out = append(out, parts[2])
+		}
 	}
-
-	return string(out)
+	return strings.ToUpper(strings.Join(out, "_"))
 }
 
 // StdinConfigLoader provides autowiring of config values piped in from stdin
-type StdinConfigLoader struct { }
+type StdinConfigLoader struct{}
 
 // Load trigger recursive load of config values from yaml piped to stdin
 func (s *StdinConfigLoader) Load(config interface{}) error {
-    stat, _ := os.Stdin.Stat()
-    if (stat.Mode() & os.ModeCharDevice) == 0 {
-        buf := new(bytes.Buffer)
-        buf.ReadFrom(os.Stdin)
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(os.Stdin)
 
-        viper.SetConfigType("yaml")
-        if err := viper.ReadConfig(buf); err != nil {
-            return err
-        }
-    }
-    return nil
+		viper.SetConfigType("yaml")
+		if err := viper.ReadConfig(buf); err != nil {
+			return err
+		}
+	}
+	return nil
 }

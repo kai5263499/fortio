@@ -3,23 +3,27 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"time"
 
 	"github.com/CrowdStrike/fortio"
 	"gopkg.in/yaml.v2"
 )
 
 type ExampleConfig struct {
-	Timeout int64  `config:"env=TIMEOUT;default=100000;usage=Timeout for service" json:"timeout"`
-	Name    string `config:"default=;usage=Name of service" json:"name"`
+	Timeout  fortio.Duration `config:"env=TIMEOUT;default=100ms;usage=Timeout for service" json:"timeout"`
+	Name     string          `config:"default=test;usage=Name of service" json:"name"`
+	Registry Registry        `config:";default=./registry.json;usage="`
 }
 
 // Validates assigned config values
 func (ec *ExampleConfig) Validate() error {
-	if ec.Timeout > 100000 {
-		return errors.New("Timeout can't be greater than 100ms")
+	if ec.Timeout.Duration > time.Duration(100)*time.Millisecond {
+		return errors.New("timeout can't be greater than 100ms")
 	}
 	if ec.Name == "" {
-		return errors.New("Name can't be empty")
+		return errors.New("name can't be empty")
 	}
 	return nil
 }
@@ -40,16 +44,56 @@ func main() {
 	// Initialize empty config as pointer
 	config := &ExampleConfig{}
 	// Initialize config manager
-	cm := fortio.NewConfigManager("fortio-test", "My Fortio example")
+	cmdLineLoader := fortio.NewCmdLineConfigLoader(&Registry{})
+	cm := fortio.NewConfigManager("fortio-test", "My Fortio example", cmdLineLoader)
 	// Pass config pointer to be loaded from env variables
 	err := cm.Load(config)
 	if err != nil {
-		// handle error
+		panic(err)
 	}
+
+	fmt.Printf("Loaded config: %+v\n", config)
 
 	// validate configs loaded
 	err = config.Validate()
 	if err != nil {
 		// handle error
 	}
+}
+
+type Registry struct {
+	RegType string
+	Name    string
+	Age     int
+}
+
+func (r *Registry) String() string {
+	return "fortio.registry"
+}
+
+func (r *Registry) Set(s string) error {
+	reg, err := LoadRegistryFromFile(s)
+	if err != nil {
+		return err
+	}
+	*r = *reg
+	return nil
+}
+
+func (r *Registry) Type() string {
+	return "fortio.registry"
+}
+
+func LoadRegistryFromFile(path string) (*Registry, error) {
+	raw, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &Registry{}
+	err = json.Unmarshal(raw, &c)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
