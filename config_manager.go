@@ -33,7 +33,7 @@ var camelCaseRegex = regexp.MustCompile("(^[^A-Z]*|[A-Z]*)([A-Z][^A-Z]+|$)")
 // parse accordingly
 type namespace string
 
-// ConfigManager auto wires the given config pointer with given set of
+// Manager auto wires the given config pointer with given set of
 // config loaders to NewConfigManager API
 type Manager struct {
 	appName       string

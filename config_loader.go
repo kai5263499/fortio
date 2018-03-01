@@ -22,6 +22,7 @@ type CmdLineConfigLoader struct {
 	types []interface{}
 }
 
+// NewCmdLineConfigLoader will return new CmdLineConfigLoader with capability to read given types
 func NewCmdLineConfigLoader(types ...interface{}) *CmdLineConfigLoader {
 	types = append(types, &Duration{})
 	return &CmdLineConfigLoader{

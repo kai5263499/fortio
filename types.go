@@ -31,6 +31,8 @@ func (sl *StringList) Type() string {
 	return "fortio.StringList"
 }
 
+// StringParsable interface can be implemented by any struct that needs to be
+// loaded as string as is and not go through its fields recursively
 type StringParsable interface {
 	ParseString(string) error
 }
