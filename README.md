@@ -17,14 +17,20 @@ go get github.com/CrowdStrike/fortio
 
 Define your config that must be auto wired
 ```go
+import (
+	"encoding/json"
+	"github.com/CrowdStrike/fortio"
+	"gopkg.in/yaml.v2"
+)
+
 type ExampleConfig struct {
-	Timeout int64  `config:"env=TIMEOUT,default=100000;usage=Timeout for service" json:"timeout"`
-	Name    string `config:"default=;usage=Name of service" json:"name"`
+	Timeout fortio.Duration  `config:"env=TIMEOUT,default=100ms;usage=Timeout for service" json:"timeout"`
+	Name    string           `config:"default=;usage=Name of service" json:"name"`
 }
 
 // Validates assigned config values
 func (ec *ExampleConfig) Validate() error {
-	if ec.Timeout > 100000 {
+	if ec.Timeout.Duration > time.Duration(100) * time.Millisecond {
 		return errors.New("Timeout can't be greater than 100ms")
 	}
 	if ec.Name == "" {
@@ -79,4 +85,6 @@ Checkout above example from [example.go](https://github.com/CrowdStrike/fortio/b
 
 ## Contribute
 
-TODO:
+We will be happy to accept contributions, please open a issue first on what you are trying to fix or solve and once you get feedback on it from other team members, 
+go ahead and submit a pull request and we will be happy to take a look at merge it.
+
