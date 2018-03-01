@@ -3,7 +3,6 @@ package fortio
 import (
 	"fmt"
 	"regexp"
-	"time"
 
 	"unicode"
 
@@ -15,6 +14,7 @@ import (
 	"log"
 
 	"bytes"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -96,6 +96,10 @@ func (cm *Manager) SetLogger(logger Logger) {
 // Load will create command line flags for given config and loads values into
 // it from environment variables
 func (cm *Manager) Load(config Config) error {
+	return cm.load(config, true)
+}
+
+func (cm *Manager) load(config Config, execute bool) error {
 	err := cm.createCommandLineFlags(cm.rootCmd, config)
 	if err != nil {
 		cm.logger.Errorf("Unable to load config - %v", err)
@@ -104,10 +108,12 @@ func (cm *Manager) Load(config Config) error {
 
 	cm.rootCmd.Run = func(cmd *cobra.Command, args []string) {}
 
-	if err := cm.rootCmd.Execute(); err != nil {
-		cm.logger.Debugf("Command line args: %+v", os.Args)
-		cm.logger.Errorf("Error executing rootCmd - %v", err)
-		return err
+	if execute {
+		if err := cm.rootCmd.Execute(); err != nil {
+			cm.logger.Debugf("Command line args: %+v", os.Args)
+			cm.logger.Errorf("Error executing rootCmd - %v", err)
+			return err
+		}
 	}
 
 	for _, loader := range cm.configLoaders {
@@ -227,10 +233,6 @@ func (cm *Manager) createCommandLineFlags(cmd *cobra.Command, config interface{}
 			// Any type implementing pflag.Value will be automatically supported
 			viper.SetDefault(lFirst, field.defaultValue)
 			cmd.PersistentFlags().Var(ptr, lFirst, field.usage)
-		case *time.Duration:
-			def := viper.GetDuration(field.defaultValue)
-			viper.SetDefault(lFirst, field.defaultValue)
-			cmd.PersistentFlags().Duration(lFirst, def, field.usage)
 		default:
 			cm.logger.Warnf("unknown field %s type %v", field.name, reflect.TypeOf(field))
 		}

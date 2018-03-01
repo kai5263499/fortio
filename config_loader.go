@@ -23,6 +23,7 @@ type CmdLineConfigLoader struct {
 }
 
 func NewCmdLineConfigLoader(types ...interface{}) *CmdLineConfigLoader {
+	types = append(types, &Duration{})
 	return &CmdLineConfigLoader{
 		types: types,
 	}
@@ -85,8 +86,8 @@ func (cmd *CmdLineConfigLoader) loadValue(dest reflect.Value, name string) error
 		val := viper.GetInt64(name)
 		dest.Elem().SetInt(val)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		val := viper.GetInt64(name)
-		dest.Elem().SetInt(val)
+		val := uint64(viper.GetInt64(name))
+		dest.Elem().SetUint(val)
 	case reflect.Float32, reflect.Float64:
 		val := viper.GetFloat64(name)
 		dest.Elem().SetFloat(val)
