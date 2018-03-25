@@ -24,6 +24,7 @@ const (
 	tagName = "config"
 
 	environmentVariable namespace = "env"
+	configURL           namespace = "url"
 )
 
 var camelCaseRegex = regexp.MustCompile("(^[^A-Z]*|[A-Z]*)([A-Z][^A-Z]+|$)")
@@ -245,6 +246,12 @@ func (cm *Manager) createCommandLineFlags(cmd *cobra.Command, config interface{}
 			} else {
 				viper.BindEnv(lFirst, underscoreField)
 			}
+		case configURL:
+			if field.url != "" {
+				viper.BindEnv(lFirst, field.url)
+			} else {
+				return fmt.Errorf("url tag can't be empty")
+			}
 		}
 		viper.BindPFlag(lFirst, cmd.PersistentFlags().Lookup(lFirst))
 	}
@@ -264,6 +271,7 @@ type field struct {
 	namespace    namespace
 	usage        string
 	env          string
+	url          string
 	required     bool
 }
 
@@ -348,6 +356,8 @@ func getField(fld reflect.StructField) field {
 			f.env = t[1]
 		} else if t[0] == "required" {
 			f.required = true
+		} else if t[0] == "url" {
+			f.url = t[1]
 		}
 
 	}

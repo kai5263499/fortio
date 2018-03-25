@@ -12,9 +12,10 @@ import (
 )
 
 type ExampleConfig struct {
-	Timeout  fortio.Duration `config:"env=TIMEOUT;default=100ms;usage=Timeout for service" json:"timeout"`
-	Name     string          `config:"default=test;usage=Name of service" json:"name"`
-	Registry Registry        `config:";default=./registry.json;usage="`
+	Timeout  fortio.Duration  `config:"env=TIMEOUT;default=100ms;usage=Timeout for service" json:"timeout"`
+	Name     string           `config:"default=test;usage=Name of service" json:"name"`
+	Registry Registry         `config:";default=./registry.json;usage="`
+	Map      fortio.MapObject `config:";default={\"a\":\"b\"};usage="`
 }
 
 // Validates assigned config values

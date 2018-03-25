@@ -1,8 +1,11 @@
 package fortio
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 // StringList is of type []string
@@ -56,4 +59,46 @@ func (d *Duration) Set(s string) error {
 // Type returns type name
 func (d *Duration) Type() string {
 	return "fortio.Duration"
+}
+
+// MapObject implements StringParsable and read int a JSON object into
+// map[string]interface{}
+type MapObject struct {
+	Mapping map[string]interface{}
+}
+
+// ParseString exists to satisfy the StringParsable interface
+func (jm *MapObject) ParseString(s string) error {
+	jsonMap := &MapObject{}
+	mapping := map[string]interface{}{}
+	err := json.Unmarshal([]byte(s), &mapping)
+	if err != nil {
+		err := yaml.Unmarshal([]byte(s), &mapping)
+		if err != nil {
+			return err
+		}
+	}
+	*jm = *jsonMap
+	jm.Mapping = mapping
+	return nil
+}
+
+// String returns JSON string of the MapObject
+func (jm *MapObject) String() string {
+	b, err := json.Marshal(jm.Mapping)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// Set will set the JSON/YAML string to MapObject
+func (jm *MapObject) Set(s string) error {
+	return jm.ParseString(s)
+
+}
+
+// Type returns type of the object
+func (jm *MapObject) Type() string {
+	return "fortio.MapObject"
 }
