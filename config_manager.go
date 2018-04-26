@@ -85,7 +85,7 @@ func NewConfigManager(appName, description string, configLoaders ...ConfigLoader
 		appName:       appName,
 		logger:        NewStdLogger(3, log.Ldate|log.Ltime),
 		rootCmd:       rootCmd,
-		configLoaders: configLoaders,
+		configLoaders: append(configLoaders, NewCmdLineConfigLoader()),
 	}
 }
 

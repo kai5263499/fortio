@@ -45,8 +45,8 @@ func main() {
 	// Initialize empty config as pointer
 	config := &ExampleConfig{}
 	// Initialize config manager
-	cmdLineLoader := fortio.NewCmdLineConfigLoader(&Registry{})
-	cm := fortio.NewConfigManager("fortio-test", "My Fortio example", cmdLineLoader)
+	registryLoader := fortio.NewCmdLineConfigLoader(&Registry{})
+	cm := fortio.NewConfigManager("fortio-test", "My Fortio example", registryLoader)
 	// Pass config pointer to be loaded from env variables
 	err := cm.Load(config)
 	if err != nil {
