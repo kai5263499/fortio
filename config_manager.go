@@ -85,7 +85,7 @@ func NewConfigManager(appName, description string, configLoaders ...ConfigLoader
 		appName:       appName,
 		logger:        NewStdLogger(3, log.Ldate|log.Ltime),
 		rootCmd:       rootCmd,
-		configLoaders: append(configLoaders, NewCmdLineConfigLoader()),
+		configLoaders: append(configLoaders, &CmdLineConfigLoader{}),
 	}
 }
 
@@ -273,16 +273,6 @@ type field struct {
 	env          string
 	url          string
 	required     bool
-}
-
-func firstLowerPos(s string) int {
-	for p, c := range s {
-		if !unicode.IsUpper(c) {
-			return p
-		}
-	}
-
-	return -1
 }
 
 // Turn the first character in a camel case string to lowercase

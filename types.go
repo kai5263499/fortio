@@ -51,6 +51,10 @@ func (d *Duration) String() string { return d.Duration.String() }
 
 // Set will parse given string as time.Duration and sets to Duration
 func (d *Duration) Set(s string) error {
+	return d.ParseString(s)
+}
+
+func (d *Duration) ParseString(s string) error {
 	v, err := time.ParseDuration(s)
 	*d = Duration{v}
 	return err

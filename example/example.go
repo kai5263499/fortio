@@ -45,8 +45,7 @@ func main() {
 	// Initialize empty config as pointer
 	config := &ExampleConfig{}
 	// Initialize config manager
-	registryLoader := fortio.NewCmdLineConfigLoader(&Registry{})
-	cm := fortio.NewConfigManager("fortio-test", "My Fortio example", registryLoader)
+	cm := fortio.NewConfigManager("fortio-test", "My Fortio example")
 	// Pass config pointer to be loaded from env variables
 	err := cm.Load(config)
 	if err != nil {
@@ -79,6 +78,10 @@ func (r *Registry) Set(s string) error {
 	}
 	*r = *reg
 	return nil
+}
+
+func (r *Registry) ParseString(s string) error {
+	return r.Set(s)
 }
 
 func (r *Registry) Type() string {
