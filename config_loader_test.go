@@ -9,8 +9,8 @@ import (
 
 func TestCmdLineConfigLoader(t *testing.T) {
 	c := &Conf{}
-	cmdLineLoader := NewCmdLineConfigLoader()
-	cm := NewConfigManager("fortio-test", "My Fortio test", cmdLineLoader)
+
+	cm := NewConfigManager("fortio-test", "My Fortio test")
 	err := cm.load(c, false)
 	if err != nil {
 		t.Errorf("Config loading not supposed to fail - %s", err.Error())
