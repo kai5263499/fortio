@@ -15,6 +15,7 @@ import (
 
 	"bytes"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -38,16 +39,21 @@ type namespace string
 // config loaders to NewConfigManager API
 type Manager struct {
 	appName       string
+	description   string
 	rootCmd       *cobra.Command
 	logger        Logger
 	configLoaders []ConfigLoader
 }
 
 // NewConfigManagerWithRootCmd returns a configManager using the provided rootCmd
-func NewConfigManagerWithRootCmd(rootCmd *cobra.Command, configLoaders ...ConfigLoader) *Manager {
+func NewConfigManagerWithRootCmd(appName, description string, rootCmd *cobra.Command) *Manager {
 	return &Manager{
-		rootCmd:       rootCmd,
-		configLoaders: configLoaders,
+		appName:     appName,
+		description: description,
+		rootCmd:     rootCmd,
+		configLoaders: []ConfigLoader{
+			&CmdLineConfigLoader{},
+		},
 	}
 }
 
@@ -97,24 +103,10 @@ func (cm *Manager) SetLogger(logger Logger) {
 // Load will create command line flags for given config and loads values into
 // it from environment variables
 func (cm *Manager) Load(config Config) error {
-	return cm.load(config, true)
-}
-
-func (cm *Manager) load(config Config, execute bool) error {
 	err := cm.createCommandLineFlags(cm.rootCmd, config)
 	if err != nil {
 		cm.logger.Errorf("Unable to load config - %v", err)
 		return err
-	}
-
-	cm.rootCmd.Run = func(cmd *cobra.Command, args []string) {}
-
-	if execute {
-		if err := cm.rootCmd.Execute(); err != nil {
-			cm.logger.Debugf("Command line args: %+v", os.Args)
-			cm.logger.Errorf("Error executing rootCmd - %v", err)
-			return err
-		}
 	}
 
 	for _, loader := range cm.configLoaders {
@@ -132,6 +124,17 @@ func (cm *Manager) load(config Config, execute bool) error {
 	return nil
 }
 
+// LoadOnly only loads viper values into the config struct, doesn't Execute the cobra command
+func (cm *Manager) LoadOnly(config interface{}) error {
+	for _, loader := range cm.configLoaders {
+		err := loader.Load(config)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // createCommandLineFlags will create command line flags for given config via Cobra and Viper
 // to support command line overriding of config values
 func (cm *Manager) createCommandLineFlags(cmd *cobra.Command, config interface{}) error {
@@ -145,7 +148,7 @@ func (cm *Manager) createCommandLineFlags(cmd *cobra.Command, config interface{}
 			if field.defaultValue != "" {
 				viper.SetDefault(lFirst, field.defaultValue)
 			}
-			cmd.PersistentFlags().String(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().StringP(lFirst, field.short, *ptr, field.usage)
 		case *int:
 			val, err := strconv.Atoi(field.defaultValue)
 			if err != nil {
@@ -229,7 +232,7 @@ func (cm *Manager) createCommandLineFlags(cmd *cobra.Command, config interface{}
 				cm.logger.Fatalf("default specified for %s is not a bool", field.name)
 			}
 			viper.SetDefault(lFirst, val)
-			cmd.PersistentFlags().Bool(lFirst, *ptr, field.usage)
+			cmd.PersistentFlags().BoolP(lFirst, field.short, *ptr, field.usage)
 		case pflag.Value:
 			// Any type implementing pflag.Value will be automatically supported
 			viper.SetDefault(lFirst, field.defaultValue)
@@ -271,6 +274,7 @@ type field struct {
 	namespace    namespace
 	usage        string
 	env          string
+	short        string
 	url          string
 	required     bool
 }
@@ -311,6 +315,10 @@ func lowerFirst(s string) string {
 
 func getAllFields(obj interface{}, m map[string]field) {
 	xv := reflect.ValueOf(obj).Elem() // Dereference into addressable value
+	if !xv.IsValid() {
+		logrus.Error("invalid obj!")
+		return
+	}
 	xt := xv.Type()
 
 	for i := 0; i < xt.NumField(); i++ {
